@@ -31,8 +31,14 @@ jobs:
       - name: Build iOS
         run: flutter build ios --no-codesign --release
 
+      - name: Create IPA
+        run: |
+          mkdir Payload
+          cp -r build/ios/iphoneos/Runner.app Payload/
+          zip -r ios-build-unsigned.ipa Payload/
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build
-          path: build/ios/iphoneos/Runner.app
+          name: ios-build-ipa
+          path: ios-build-unsigned.ipa
