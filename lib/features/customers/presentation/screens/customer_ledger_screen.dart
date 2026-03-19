@@ -10,6 +10,7 @@ import '../../domain/entities/ledger_entry.dart';
 import '../../domain/entities/payment.dart';
 import '../../../customers/domain/entities/customer.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../core/utils/app_date_utils.dart';
 
 class CustomerLedgerScreen extends StatefulWidget {
   final Customer customer;
@@ -23,6 +24,15 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
   DateTime _startDate = DateTime.now().subtract(const Duration(days: 30));
   DateTime _endDate = DateTime.now();
   String _activeFilter = 'Last 30 Days';
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize with last 30 days but normalized
+    final now = DateTime.now();
+    _startDate = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 30));
+    _endDate = now;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,28 +138,35 @@ class _CustomerLedgerScreenState extends State<CustomerLedgerScreen> {
           _FilterChip(
             label: 'Today',
             isActive: _activeFilter == 'Today',
-            onTap: () => _applyFilter(context, 'Today', DateTime.now(), DateTime.now()),
+            onTap: () {
+              final range = AppDateUtils.getToday();
+              _applyFilter(context, 'Today', range.start, range.end);
+            },
           ),
           _FilterChip(
             label: 'This Week',
             isActive: _activeFilter == 'This Week',
             onTap: () {
-              final now = DateTime.now();
-              _applyFilter(context, 'This Week', now.subtract(Duration(days: now.weekday - 1)), now);
+              final range = AppDateUtils.getThisWeek();
+              _applyFilter(context, 'This Week', range.start, range.end);
             },
           ),
           _FilterChip(
             label: 'This Month',
             isActive: _activeFilter == 'This Month',
             onTap: () {
-              final now = DateTime.now();
-              _applyFilter(context, 'This Month', DateTime(now.year, now.month, 1), now);
+              final range = AppDateUtils.getThisMonth();
+              _applyFilter(context, 'This Month', range.start, range.end);
             },
           ),
           _FilterChip(
             label: 'Last 30 Days',
             isActive: _activeFilter == 'Last 30 Days',
-            onTap: () => _applyFilter(context, 'Last 30 Days', DateTime.now().subtract(const Duration(days: 30)), DateTime.now()),
+            onTap: () {
+              final now = DateTime.now();
+              final start = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 30));
+              _applyFilter(context, 'Last 30 Days', start, now);
+            },
           ),
           _FilterChip(
             label: 'Custom',

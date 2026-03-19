@@ -122,10 +122,11 @@ class LedgerBloc extends Bloc<LedgerEvent, LedgerState> {
       (failure) => emit(LedgerError(failure.message)),
       (_) {
         emit(PaymentSuccess());
+        final now = DateTime.now();
         add(LoadLedgerEvent(
           customerId: event.payment.customerId,
-          start: DateTime.now().subtract(const Duration(days: 365)),
-          end: DateTime.now(),
+          start: DateTime(now.year, now.month, now.day).subtract(const Duration(days: 365)),
+          end: now,
         ));
       },
     );

@@ -9,6 +9,8 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/app_date_utils.dart';
 import '../../../../core/widgets/shared_widgets.dart';
 import '../bloc/booking_bloc.dart';
+import '../pdf/delivery_report_generator.dart';
+import 'package:printing/printing.dart';
 
 class BookingListScreen extends StatefulWidget {
   const BookingListScreen({super.key});
@@ -34,6 +36,12 @@ class _BookingListScreenState extends State<BookingListScreen> {
               builder: (context) => IconButton(
                 icon: const Icon(Icons.calendar_month_outlined),
                 onPressed: () => _showDateFilter(context),
+              ),
+            ),
+            Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.ios_share_rounded),
+                onPressed: () => _exportReport(context),
               ),
             ),
           ],
@@ -117,6 +125,28 @@ class _BookingListScreenState extends State<BookingListScreen> {
             dateRange: _selectedRange,
             status: _selectedStatus,
           ));
+    }
+  }
+
+  void _exportReport(BuildContext context) async {
+    final state = context.read<BookingBloc>().state;
+    if (state is BookingLoaded) {
+      if (state.bookings.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No bookings to export')),
+        );
+        return;
+      }
+
+      final pdfBytes = await DeliveryReportGenerator.generate(
+        bookings: state.bookings,
+        dateRangeLabel: _selectedRange.label,
+      );
+
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'delivery_report_${_selectedRange.label.replaceAll(' ', '_').toLowerCase()}.pdf',
+      );
     }
   }
 }

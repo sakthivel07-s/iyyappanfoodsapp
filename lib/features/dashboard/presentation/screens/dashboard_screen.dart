@@ -10,15 +10,30 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/shared_widgets.dart';
 import '../../../bookings/domain/entities/booking.dart';
 import '../../../bookings/presentation/bloc/booking_bloc.dart';
+import '../../../products/presentation/bloc/stock_planner_bloc.dart';
+import '../../../products/presentation/bloc/product_bloc.dart';
+import '../../../products/presentation/widgets/quick_sale_sheet.dart';
+import '../../../bookings/presentation/pdf/delivery_report_generator.dart';
+import 'package:printing/printing.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => sl<BookingBloc>()
-        ..add(LoadBookingsEvent(dateRange: AppDateUtils.getToday())),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => sl<BookingBloc>()
+            ..add(LoadBookingsEvent(dateRange: AppDateUtils.getToday())),
+        ),
+        BlocProvider(
+          create: (_) => sl<StockPlannerBloc>(),
+        ),
+        BlocProvider(
+          create: (_) => sl<ProductBloc>()..add(LoadProductsEvent()),
+        ),
+      ],
       child: const _DashboardView(),
     );
   }
@@ -29,27 +44,50 @@ class _DashboardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(context),
-          SliverPadding(
-            padding: const EdgeInsets.all(AppSizes.md),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _HeroRevenueCard(),
-                const SizedBox(height: AppSizes.md),
-                _QuickActions(),
-                const SizedBox(height: AppSizes.md),
-                _MoreActions(),
-                const SizedBox(height: AppSizes.md),
-                const SectionHeader(title: AppStrings.recentBookings),
-                const SizedBox(height: AppSizes.sm),
-                _RecentBookingsList(),
-              ]),
+    return BlocListener<StockPlannerBloc, StockPlannerState>(
+      listener: (context, state) {
+        if (state is StockPlannerOperationSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
             ),
-          ),
-        ],
+          );
+          // Refresh bookings to show the new walk-in sale
+          context.read<BookingBloc>().add(LoadBookingsEvent(dateRange: AppDateUtils.getToday()));
+        } else if (state is StockPlannerError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppColors.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        body: CustomScrollView(
+          slivers: [
+            _buildAppBar(context),
+            SliverPadding(
+              padding: const EdgeInsets.all(AppSizes.md),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  _HeroRevenueCard(),
+                  const SizedBox(height: AppSizes.md),
+                  _QuickActions(),
+                  const SizedBox(height: AppSizes.md),
+                  _MoreActions(),
+                  const SizedBox(height: AppSizes.md),
+                  const SectionHeader(title: AppStrings.recentBookings),
+                  const SizedBox(height: AppSizes.sm),
+                  _RecentBookingsList(),
+                ]),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -214,8 +252,61 @@ class _MoreActions extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSizes.md),
-        const Spacer(),
+        Expanded(
+          child: _ActionCard(
+            icon: Icons.flash_on_rounded,
+            label: 'Walk-in Customer',
+            color: Colors.purple,
+            onTap: () => _showWalkInSaleSheet(context),
+          ),
+        ),
+        const SizedBox(width: AppSizes.md),
+        Expanded(
+          child: _ActionCard(
+            icon: Icons.picture_as_pdf_rounded,
+            label: 'Delivery Report',
+            color: Colors.redAccent,
+            onTap: () => _showTodayDeliveryReport(context),
+          ),
+        ),
       ],
+    );
+  }
+
+  void _showTodayDeliveryReport(BuildContext context) async {
+    final state = context.read<BookingBloc>().state;
+    if (state is BookingLoaded) {
+      if (state.bookings.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No bookings yet today')),
+        );
+        return;
+      }
+
+      final pdfBytes = await DeliveryReportGenerator.generate(
+        bookings: state.bookings,
+        dateRangeLabel: 'Today (${AppDateUtils.formatDate(DateTime.now())})',
+      );
+
+      await Printing.sharePdf(
+        bytes: pdfBytes,
+        filename: 'delivery_report_today.pdf',
+      );
+    }
+  }
+
+  void _showWalkInSaleSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => MultiBlocProvider(
+        providers: [
+          BlocProvider.value(value: context.read<StockPlannerBloc>()),
+          BlocProvider.value(value: context.read<ProductBloc>()),
+        ],
+        child: const QuickSaleSheet(),
+      ),
     );
   }
 }
@@ -239,27 +330,35 @@ class _ActionCard extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppSizes.radiusLg),
       child: Container(
-        padding: const EdgeInsets.all(AppSizes.md),
+        padding: const EdgeInsets.symmetric(vertical: AppSizes.md, horizontal: AppSizes.sm),
         decoration: BoxDecoration(
           color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(AppSizes.radiusLg),
           border: Border.all(color: color.withOpacity(0.2)),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 42,
-              height: 42,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 color: color.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                borderRadius: BorderRadius.circular(AppSizes.radiusLg),
               ),
-              child: Icon(icon, color: color, size: AppSizes.iconMd),
+              child: Icon(icon, color: color, size: 24),
             ),
-            const SizedBox(width: AppSizes.sm),
-            Expanded(
-              child: Text(label,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(color: color)),
+            const SizedBox(height: AppSizes.sm),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
             ),
           ],
         ),
