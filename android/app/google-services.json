@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "105265930770",
+    "project_id": "iyyappanfoods-app",
+    "storage_bucket": "iyyappanfoods-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:105265930770:android:1f3c21eff1c9f763f82ecb",
+        "android_client_info": {
+          "package_name": "com.iyyappan.foods"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDGhSlqGhA3I3fpig7qsf2NM983TlTls5Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
