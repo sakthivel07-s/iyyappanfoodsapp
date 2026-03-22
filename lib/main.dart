@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'app_root.dart';
 import 'core/di/service_locator.dart';
 
+import 'firebase_options.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -21,8 +23,10 @@ void main() async {
     ),
   );
 
-  // Initialize Firebase (Assuming already configured for both platforms)
-  await Firebase.initializeApp();
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Initialize Dependency Injection
   await initServiceLocator();
